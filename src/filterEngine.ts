@@ -4,19 +4,38 @@
  * design.md §6
  */
 
-import type { AppState, FilterState, ProgramRecord } from './types'
+import type { AppState, FilterState, ProgramRecord, ProgramStatus, SortState } from './types'
 
 export function computeResults(
   programs: readonly ProgramRecord[],
-  state: Pick<AppState, 'debouncedQuery' | 'filters'>,
+  state: Pick<AppState, 'debouncedQuery' | 'filters' | 'sort'>,
 ): ProgramRecord[] {
-  return programs.filter(
+  const filtered = programs.filter(
     (p) =>
       matchesSearch(p, state.debouncedQuery) &&
       matchesInsuranceTypes(p, state.filters.insuranceTypes) &&
       matchesGrantStatuses(p, state.filters.grantStatuses) &&
       matchesSupportAmounts(p, state.filters.supportAmounts),
   )
+  return sortResults(filtered, state.sort)
+}
+
+function sortResults(programs: ProgramRecord[], sort: SortState): ProgramRecord[] {
+  if (sort.field === null) return programs
+  const dir = sort.direction === 'asc' ? 1 : -1
+  return [...programs].sort((a, b) => {
+    if (sort.field === 'grantAmount') {
+      const aVal = a.grantAmount ?? -Infinity
+      const bVal = b.grantAmount ?? -Infinity
+      return (aVal - bVal) * dir
+    }
+    if (sort.field === 'lastUpdated') {
+      const aVal = a.lastUpdated?.getTime() ?? -Infinity
+      const bVal = b.lastUpdated?.getTime() ?? -Infinity
+      return (aVal - bVal) * dir
+    }
+    return 0
+  })
 }
 
 export function matchesSearch(program: ProgramRecord, query: string): boolean {
@@ -70,6 +89,35 @@ function rangeMatches(key: string, amount: number): boolean {
     default:
       return false
   }
+}
+
+// ---------------------------------------------------------------------------
+// Count programs per filter value / status (for pill badges)
+// ---------------------------------------------------------------------------
+
+export function computeFilterCounts(
+  programs: readonly ProgramRecord[],
+): { statuses: Map<string, number>; insuranceTypes: Map<string, number> } {
+  const statuses = new Map<string, number>()
+  const insuranceTypes = new Map<string, number>()
+  for (const p of programs) {
+    const s = p.status.toLowerCase()
+    statuses.set(s, (statuses.get(s) ?? 0) + 1)
+    for (const t of p.insuranceTypes) {
+      insuranceTypes.set(t, (insuranceTypes.get(t) ?? 0) + 1)
+    }
+  }
+  return { statuses, insuranceTypes }
+}
+
+export function computeStatusCounts(
+  programs: readonly ProgramRecord[],
+): Map<ProgramStatus, number> {
+  const counts = new Map<ProgramStatus, number>()
+  for (const p of programs) {
+    counts.set(p.status, (counts.get(p.status) ?? 0) + 1)
+  }
+  return counts
 }
 
 // ---------------------------------------------------------------------------

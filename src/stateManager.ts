@@ -5,7 +5,7 @@
  * design.md §5
  */
 
-import type { AppState, FilterState, ProgramRecord } from './types'
+import type { AppState, FilterState, ProgramRecord, SortState } from './types'
 import { trackEvent } from './analytics'
 
 const DISCLAIMER_KEY = 'ff-disclaimer-v1'
@@ -16,11 +16,14 @@ const emptyFilters = (): FilterState => ({
   supportAmounts: new Set<string>(),
 })
 
+const defaultSort = (): SortState => ({ field: null, direction: 'desc' })
+
 let state: AppState = {
   allPrograms: [],
   query: '',
   debouncedQuery: '',
   filters: emptyFilters(),
+  sort: defaultSort(),
   expandedProgramId: null,
   phase: 'loading',
   errorMessage: null,
@@ -49,6 +52,7 @@ export function initState(programs: ProgramRecord[]): void {
     query: '',
     debouncedQuery: '',
     filters: emptyFilters(),
+    sort: defaultSort(),
     expandedProgramId: null,
     phase: disclaimerSeen ? 'ready' : 'disclaimer',
     errorMessage: null,
@@ -87,13 +91,26 @@ export function toggleFilter(dim: keyof FilterState, value: string): void {
 }
 
 export function acknowledgeDisclaimer(): void {
-  try {
-    sessionStorage.setItem(DISCLAIMER_KEY, '1')
-  } catch {
-    // ignore — we'll show the disclaimer again next load
-  }
+  // TODO: removing session storage
+  // try {
+  //   sessionStorage.setItem(DISCLAIMER_KEY, '1')
+  // } catch {
+  //   // ignore — we'll show the disclaimer again next load
+  // }
   trackEvent('disclaimer_accepted')
   setState('phase', 'ready')
+}
+
+export function clearFilters(): void {
+  setState('filters', {
+    insuranceTypes: new Set(),
+    grantStatuses: new Set(),
+    supportAmounts: new Set(),
+  })
+}
+
+export function setSort(field: SortState['field'], direction: SortState['direction']): void {
+  setState('sort', { field, direction })
 }
 
 export function resetState(): void {
@@ -102,6 +119,7 @@ export function resetState(): void {
     query: '',
     debouncedQuery: '',
     filters: emptyFilters(),
+    sort: defaultSort(),
     expandedProgramId: null,
   }
   notify()
