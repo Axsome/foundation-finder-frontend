@@ -9,6 +9,7 @@
  */
 
 import type { MetadataField, ProgramRecord, ProgramStatus } from './types'
+import { FIELD_MAPPINGS, MARKER_ATTRIBUTE } from './fieldMappings'
 
 const VALID_STATUSES = new Set<ProgramStatus>([
   'Open',
@@ -35,15 +36,27 @@ const VALID_STATUSES = new Set<ProgramStatus>([
  *   - The source CMS wrapper element(s) are hidden (display:none)
  */
 export function readPrograms(): ProgramRecord[] {
+  // Only read leaf-level [data-ff-program] elements — those that contain no
+  // nested [data-ff-program] descendants. In Webflow, the .w-dyn-item wrapper
+  // may also receive the attribute, which would otherwise cause each program to
+  // appear twice in the result set.
   const elements = Array.from(
     document.querySelectorAll<HTMLElement>('[data-ff-program]'),
-  ).filter((el) => el.id !== 'foundation-finder-root')
+  ).filter(
+    (el) =>
+      el.id !== 'foundation-finder-root' &&
+      el.querySelectorAll('[data-ff-program]').length === 0,
+  )
 
   const records: ProgramRecord[] = []
+  const seenIds = new Set<string>()
 
   for (const el of elements) {
     try {
-      records.push(parseProgram(el))
+      const record = parseProgram(el)
+      if (seenIds.has(record.id)) continue
+      seenIds.add(record.id)
+      records.push(record)
     } catch (err) {
       console.warn('[FoundationFinder] Failed to parse program element:', el, err)
     }
@@ -63,29 +76,31 @@ export function readPrograms(): ProgramRecord[] {
  * Parses a single [data-ff-program] element into a ProgramRecord.
  */
 function parseProgram(el: HTMLElement): ProgramRecord {
-  const id = attr(el, 'data-ff-program-id') || slugify(attr(el, 'data-ff-program-name'))
+  const id = attr(el, FIELD_MAPPINGS.programId) || slugify(attr(el, FIELD_MAPPINGS.programName))
 
-  const rawStatus = attr(el, 'data-ff-status')
+  const rawStatus = attr(el, FIELD_MAPPINGS.status)
   const status: ProgramStatus = VALID_STATUSES.has(rawStatus as ProgramStatus)
     ? (rawStatus as ProgramStatus)
     : 'Closed'
 
   return {
     id,
-    foundationName: attr(el, 'data-ff-foundation-name'),
-    programName: attr(el, 'data-ff-program-name'),
-    description: attr(el, 'data-ff-description'),
+    foundationName: attr(el, FIELD_MAPPINGS.foundationName),
+    programName: attr(el, FIELD_MAPPINGS.programName),
+    description: attr(el, FIELD_MAPPINGS.description),
     status,
-    lastUpdated: parseDate(attr(el, 'data-ff-last-updated')),
-    diseaseIndications: parseMultiRef(attr(el, 'data-ff-disease-indications')),
-    insuranceTypes: parseMultiRef(attr(el, 'data-ff-insurance-types')),
-    grantAmount: parseAmount(attr(el, 'data-ff-grant-amount')),
-    applyUrl: attr(el, 'data-ff-apply-url'),
-    programUrl: attr(el, 'data-ff-program-url'),
-    foundationUrl: attr(el, 'data-ff-foundation-url'),
-    contactEmail: attr(el, 'data-ff-contact-email'),
-    contactPhone: attr(el, 'data-ff-contact-phone'),
-    metadata: parseMetadata(attr(el, 'data-ff-metadata')),
+    lastUpdated: parseDate(attr(el, FIELD_MAPPINGS.lastUpdated)),
+    diseaseIndications: parseMultiRef(attr(el, FIELD_MAPPINGS.diseaseIndications)),
+    insuranceTypes: parseMultiRef(attr(el, FIELD_MAPPINGS.insuranceTypes)),
+    insuranceTypesRaw: attr(el, FIELD_MAPPINGS.insuranceTypes),
+    insuranceDescription: attr(el, FIELD_MAPPINGS.insuranceDescription),
+    grantAmount: parseAmount(attr(el, FIELD_MAPPINGS.grantAmount)),
+    applyUrl: attr(el, FIELD_MAPPINGS.applyUrl),
+    programUrl: attr(el, FIELD_MAPPINGS.programUrl),
+    foundationUrl: attr(el, FIELD_MAPPINGS.foundationUrl),
+    contactEmail: attr(el, FIELD_MAPPINGS.contactEmail),
+    contactPhone: attr(el, FIELD_MAPPINGS.contactPhone),
+    metadata: parseMetadata(attr(el, FIELD_MAPPINGS.metadata)),
   }
 }
 
@@ -102,13 +117,9 @@ export function parseMultiRef(raw: string): string[] {
     .filter((s) => s.length > 0)
 }
 
-/**
- * Parses a grant amount string to a number. Returns null for empty/NaN.
- */
-function parseAmount(raw: string): number | null {
-  if (!raw.trim()) return null
-  const value = parseFloat(raw)
-  return isNaN(value) ? null : value
+function parseAmount(raw: string): string | null {
+  const trimmed = raw.trim()
+  return trimmed.length > 0 ? trimmed : null
 }
 
 /**
@@ -128,13 +139,15 @@ function parseMetadata(raw: string): MetadataField[] {
   try {
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.filter(
-      (item): item is MetadataField =>
-        typeof item === 'object' &&
-        item !== null &&
-        typeof item.label === 'string' &&
-        typeof item.value === 'string',
-    )
+    return parsed
+      .filter(
+        (item): item is Record<string, unknown> =>
+          typeof item === 'object' &&
+          item !== null &&
+          typeof item.value === 'string' &&
+          (typeof item.label === 'string' || typeof item.key === 'string'),
+      )
+      .map((item) => ({ label: (item.label ?? item.key) as string, value: item.value as string }))
   } catch {
     return []
   }
@@ -165,7 +178,7 @@ function slugify(text: string): string {
  * or falls back to walking up 3 levels max to avoid hiding unrelated containers.
  */
 function hideCmsWrappers(): void {
-  const first = document.querySelector<HTMLElement>('[data-ff-program]:not(#foundation-finder-root)')
+  const first = document.querySelector<HTMLElement>(`[${MARKER_ATTRIBUTE}]:not(#foundation-finder-root)`)
   if (!first) return
 
   // Prefer the known Webflow collection list class
@@ -179,7 +192,7 @@ function hideCmsWrappers(): void {
   let wrapper: HTMLElement | null = first.parentElement
   let levels = 0
   while (wrapper && levels < 3) {
-    if (!wrapper.hasAttribute('data-ff-program')) {
+    if (!wrapper.hasAttribute(MARKER_ATTRIBUTE)) {
       wrapper.style.display = 'none'
       return
     }

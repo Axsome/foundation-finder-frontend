@@ -6,6 +6,8 @@
 
 import type { AppState, FilterState, ProgramRecord, ProgramStatus, SortState } from './types'
 
+export const INSURANCE_FILTER_TAGS = ['Medicare', 'Medicaid', 'Commercial', 'N/A']
+
 export function computeResults(
   programs: readonly ProgramRecord[],
   state: Pick<AppState, 'debouncedQuery' | 'filters' | 'sort'>,
@@ -24,10 +26,14 @@ function sortResults(programs: ProgramRecord[], sort: SortState): ProgramRecord[
   if (sort.field === null) return programs
   const dir = sort.direction === 'asc' ? 1 : -1
   return [...programs].sort((a, b) => {
+    if (sort.field === 'foundationName') {
+      return (a.foundationName.localeCompare(b.foundationName) || a.programName.localeCompare(b.programName)) * dir
+    }
     if (sort.field === 'grantAmount') {
-      const aVal = a.grantAmount ?? -Infinity
-      const bVal = b.grantAmount ?? -Infinity
-      return (aVal - bVal) * dir
+      if (a.grantAmount === null && b.grantAmount === null) return 0
+      if (a.grantAmount === null) return 1
+      if (b.grantAmount === null) return -1
+      return a.grantAmount.localeCompare(b.grantAmount) * dir
     }
     if (sort.field === 'lastUpdated') {
       const aVal = a.lastUpdated?.getTime() ?? -Infinity
@@ -54,7 +60,8 @@ export function matchesInsuranceTypes(
   selected: Set<string>,
 ): boolean {
   if (selected.size === 0) return true
-  return program.insuranceTypes.some((t) => selected.has(t.toLowerCase()))
+  const raw = program.insuranceTypesRaw.toLowerCase()
+  return [...selected].some((tag) => raw.includes(tag.toLowerCase()))
 }
 
 export function matchesGrantStatuses(
@@ -66,29 +73,10 @@ export function matchesGrantStatuses(
 }
 
 export function matchesSupportAmounts(
-  program: ProgramRecord,
-  selected: Set<string>,
+  _program: ProgramRecord,
+  _selected: Set<string>,
 ): boolean {
-  if (selected.size === 0) return true
-  if (program.grantAmount === null) return true
-
-  const amount = program.grantAmount
-  return [...selected].some((key) => rangeMatches(key, amount))
-}
-
-function rangeMatches(key: string, amount: number): boolean {
-  switch (key) {
-    case 'under-1000':
-      return amount < 1000
-    case '1000-5000':
-      return amount >= 1000 && amount < 5000
-    case '5000-10000':
-      return amount >= 5000 && amount < 10000
-    case '10000-plus':
-      return amount >= 10000
-    default:
-      return false
-  }
+  return true
 }
 
 // ---------------------------------------------------------------------------
@@ -103,9 +91,12 @@ export function computeFilterCounts(
   for (const p of programs) {
     const s = p.status.toLowerCase()
     statuses.set(s, (statuses.get(s) ?? 0) + 1)
-    for (const t of p.insuranceTypes) {
-      insuranceTypes.set(t, (insuranceTypes.get(t) ?? 0) + 1)
-    }
+  }
+  for (const tag of INSURANCE_FILTER_TAGS) {
+    const count = programs.filter((p) =>
+      p.insuranceTypesRaw.toLowerCase().includes(tag.toLowerCase())
+    ).length
+    if (count > 0) insuranceTypes.set(tag, count)
   }
   return { statuses, insuranceTypes }
 }
@@ -131,37 +122,8 @@ export interface FilterDimension {
 }
 
 export function buildFilterDimensions(programs: readonly ProgramRecord[]): FilterDimension[] {
-  const insuranceSet = new Set<string>()
-  const statusSet = new Set<string>()
-
-  for (const p of programs) {
-    for (const t of p.insuranceTypes) insuranceSet.add(t)
-    statusSet.add(p.status.toLowerCase())
-  }
-
-  const dimensions: FilterDimension[] = []
-
-  if (insuranceSet.size > 0) {
-    dimensions.push({
-      id: 'insuranceTypes',
-      label: 'Insurance Type',
-      values: [...insuranceSet].sort(),
-    })
-  }
-
-  if (statusSet.size > 0) {
-    dimensions.push({
-      id: 'grantStatuses',
-      label: 'Status',
-      values: [...statusSet].sort(),
-    })
-  }
-
-  dimensions.push({
-    id: 'supportAmounts',
-    label: 'Support Amount',
-    values: ['under-1000', '1000-5000', '5000-10000', '10000-plus'],
-  })
-
-  return dimensions
+  const presentTags = INSURANCE_FILTER_TAGS.filter((tag) =>
+    programs.some((p) => p.insuranceTypesRaw.toLowerCase().includes(tag.toLowerCase()))
+  )
+  return [{ id: 'insuranceTypes', label: 'Insurance Requirements', values: presentTags }]
 }

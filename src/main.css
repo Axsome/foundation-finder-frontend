@@ -5,6 +5,9 @@
    ============================================================================ */
 
 :root {
+  /* Map Webflow design system tokens so all --color-primary usages pick up Axsome Purple */
+  --color-primary: var(--_axsome-oms-design-system---brand--axsome-purple, #a82b8b);
+
   /* ── Foundation Finder semantic tokens ── */
   --ff-status-open:       var(--color-success, #2d7a3a);
   --ff-status-closed:     var(--color-muted, #6b7280);
@@ -43,7 +46,7 @@
 /* ── Root ──────────────────────────────────────────────────────────────────── */
 
 .ff-root {
-  font-family: var(--font-family-base, system-ui, sans-serif);
+  font-family: inherit;
   font-size: var(--font-size-base, 16px);
   color: var(--color-text, #111827);
   line-height: 1.5;
@@ -76,13 +79,22 @@
   flex-shrink: 0;
 }
 
+/* ── Search row (search + sort always on the same line) ────────────────────── */
+
+.ff-search-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-sm, 8px);
+  width: 100%;
+}
+
 /* ── Search ────────────────────────────────────────────────────────────────── */
 
 .ff-search {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  flex: 1 1 300px;
+  flex: 1 1 0;
   min-width: 0;
 }
 
@@ -162,31 +174,6 @@
   gap: var(--spacing-sm, 8px);
 }
 
-/* Mobile: show filter button, hide inline pills */
-.ff-filters-btn,
-.ff-btn.ff-filters-btn {
-  display: none;
-  align-self: flex-end;
-}
-
-.ff-root--mobile .ff-filters-btn {
-  display: flex;
-}
-
-.ff-root--mobile .ff-filters {
-  display: none;
-}
-
-/* Mobile clear-filters button — only shown when filters are active */
-.ff-mobile-clear-btn {
-  display: none;
-  align-self: center;
-}
-
-.ff-root--mobile .ff-mobile-clear-btn.ff-mobile-clear-btn--visible {
-  display: inline;
-}
-
 /* ── Sort button + popover ─────────────────────────────────────────────────── */
 
 .ff-sort-wrapper {
@@ -196,6 +183,28 @@
 
 .ff-sort-btn {
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ff-sort-btn__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  
+}
+
+@media (min-width: 480px) {
+  .ff-sort-btn__icon {
+    display: none;
+  }
+}
+
+@media (max-width: 479px) {
+  .ff-sort-btn__text {
+    display: none;
+  }
 }
 
 .ff-sort-btn--active {
@@ -339,15 +348,25 @@
   transition: background 120ms, color 120ms;
 }
 
+.ff-btn svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
 .ff-btn--primary {
-  background: var(--color-primary, #0f4c8a);
+  background: var(--color-primary, #a82b8b);
   color: var(--color-background, #ffffff);
-  border-color: var(--color-primary, #0f4c8a);
+  border-color: var(--color-primary, #a82b8b);
 }
 
 .ff-btn--primary:hover {
-  background: var(--color-primary-light, #1d6bb8);
-  border-color: var(--color-primary-light, #1d6bb8);
+  background: var(--color-primary-light, #be3da1);
+  border-color: var(--color-primary-light, #be3da1);
+}
+
+.ff-btn--primary > svg {
+  margin: 0 0 0 10px;
 }
 
 .ff-btn--disabled,
@@ -375,6 +394,21 @@
   gap: var(--spacing-lg, 24px);
 }
 
+.ff-legal-disclaimer {
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-text-muted, #6b7280);
+  font-style: italic;
+  background: var(--color-surface, #f9fafb);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--border-radius-md, 8px);
+  padding: var(--spacing-md, 16px);
+  margin-bottom: var(--spacing-md, 16px);
+}
+
+.ff-legal-disclaimer p + p {
+  margin-top: var(--spacing-sm, 8px);
+}
+
 /* ── Section header ────────────────────────────────────────────────────────── */
 
 .ff-sec-head {
@@ -399,14 +433,9 @@
   background: var(--color-background, #ffffff);
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--border-radius-md, 8px);
-  border-left: var(--ff-card-border-width) solid var(--ff-status-closed);
+  border-left: var(--ff-card-border-width) solid var(--color-primary);
   overflow: hidden;
 }
-
-.ff-card--open    { border-left-color: var(--ff-status-open); }
-.ff-card--closed  { border-left-color: var(--ff-status-closed); }
-.ff-card--pending { border-left-color: var(--ff-status-pending); }
-.ff-card--government { border-left-color: var(--ff-status-government); }
 
 .ff-card__top {
   display: flex;
@@ -420,6 +449,19 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.ff-card__top-right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+  flex-shrink: 0;
+}
+
+.ff-card__last-updated {
+  font-size: 11px;
+  color: var(--color-text-muted, #6b7280);
+  white-space: nowrap;
 }
 
 .ff-card__foundation {
@@ -447,10 +489,52 @@
   margin: 0 0 var(--spacing-md, 16px);
 }
 
+.ff-card__meta {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+
+.ff-card__meta--divided {
+  grid-template-columns: 1fr 1fr;
+}
+
+.ff-card__featured {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px var(--spacing-md, 16px);
+}
+
+.ff-card__meta--divided .ff-card__featured {
+  border-right: 1px solid var(--color-border, #d1d5db);
+  padding-right: var(--spacing-lg, 24px);
+}
+
+.ff-card__meta--divided .ff-card__dg {
+  padding-left: var(--spacing-lg, 24px);
+}
+
 .ff-card__dg {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 12px var(--spacing-md, 16px);
+}
+
+@media (max-width: 540px) {
+  .ff-card__meta--divided {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-card__meta--divided .ff-card__featured {
+    border-right: none;
+    padding-right: 0;
+    border-bottom: 1px solid var(--color-border, #d1d5db);
+    padding-bottom: var(--spacing-md, 16px);
+  }
+
+  .ff-card__meta--divided .ff-card__dg {
+    padding-left: 0;
+    padding-top: var(--spacing-md, 16px);
+  }
 }
 
 .ff-card__dg-item {
@@ -474,12 +558,38 @@
 
 .ff-card__foot {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--spacing-sm, 8px);
   padding: var(--spacing-md, 16px) var(--spacing-lg, 24px);
   border-top: 1px solid var(--color-border, #d1d5db);
+}
+
+.ff-card__contact {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  margin-right: auto;
+}
+
+.ff-card__contact-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm, 14px);
+  color: var(--color-primary, #2563eb);
+  text-decoration: none;
+}
+
+.ff-card__contact-link svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.ff-card__contact-link:hover {
+  text-decoration: underline;
 }
 
 .ff-card__links {
@@ -522,6 +632,7 @@
 .ff-status-pill--closed     { color: var(--ff-status-closed); }
 .ff-status-pill--pending    { color: var(--ff-status-pending); }
 .ff-status-pill--government { color: var(--ff-status-government); }
+.ff-status-pill--na         { color: var(--ff-status-closed); }
 
 
 /* ── Empty / Error / Loading States ───────────────────────────────────────── */
@@ -788,7 +899,15 @@
     flex-direction: column;
   }
 
+  .ff-card__top-right {
+    flex-direction: row-reverse;
+  }
+
   .ff-pill__label {
     max-width: 180px;
+  }
+  
+  .ff-card__contact {
+    flex-direction: column;
   }
 }

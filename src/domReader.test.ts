@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { readPrograms, parseMultiRef } from './domReader'
+import { FIELD_MAPPINGS, MARKER_ATTRIBUTE } from './fieldMappings'
 
 function makeProgramEl(attrs: Record<string, string>): HTMLElement {
   const el = document.createElement('div')
@@ -47,7 +48,7 @@ describe('readPrograms', () => {
     expect(r.lastUpdated?.getFullYear()).toBe(2024)
     expect(r.insuranceTypes).toEqual(['medicare', 'medicaid'])
     expect(r.diseaseIndications).toEqual(['depression', 'anxiety'])
-    expect(r.grantAmount).toBe(5000)
+    expect(r.grantAmount).toBe('5000')
     expect(r.metadata).toEqual([{ label: 'Eligibility', value: 'Income-based' }])
   })
 
@@ -63,10 +64,10 @@ describe('readPrograms', () => {
     expect(r?.status).toBe('Closed')
   })
 
-  it('sets grantAmount to null for non-numeric string', () => {
+  it('preserves non-numeric grant amount string as-is', () => {
     makeProgramEl({ 'data-ff-program-id': 'x', 'data-ff-grant-amount': 'N/A' })
     const [r] = readPrograms()
-    expect(r?.grantAmount).toBeNull()
+    expect(r?.grantAmount).toBe('N/A')
   })
 
   it('sets lastUpdated to null for invalid date', () => {
@@ -96,6 +97,17 @@ describe('readPrograms', () => {
     document.body.appendChild(wrapper)
     readPrograms()
     expect(wrapper.style.display).toBe('none')
+  })
+})
+
+describe('fieldMappings wiring', () => {
+  it('reads programName from the attribute named in FIELD_MAPPINGS', () => {
+    const el = document.createElement('div')
+    el.setAttribute(MARKER_ATTRIBUTE, '')
+    el.setAttribute(FIELD_MAPPINGS.programName, 'Mapped Name')
+    document.body.appendChild(el)
+    const [r] = readPrograms()
+    expect(r?.programName).toBe('Mapped Name')
   })
 })
 

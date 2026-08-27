@@ -18,7 +18,9 @@ function makeProgram(overrides: Partial<ProgramRecord> = {}): ProgramRecord {
     lastUpdated: null,
     diseaseIndications: ['depression'],
     insuranceTypes: ['medicare'],
-    grantAmount: 5000,
+    insuranceTypesRaw: 'Medicare required',
+    insuranceDescription: 'Medicare required',
+    grantAmount: null,
     applyUrl: '',
     programUrl: '',
     foundationUrl: '',
@@ -76,22 +78,27 @@ describe('matchesSearch', () => {
 // ── matchesInsuranceTypes ────────────────────────────────────────────────────
 
 describe('matchesInsuranceTypes', () => {
-  const p = makeProgram({ insuranceTypes: ['medicare', 'medicaid'] })
+  const p = makeProgram({ insuranceTypesRaw: 'Medicare, Medicaid, or Military Benefits' })
 
   it('returns true when no filter active', () => {
     expect(matchesInsuranceTypes(p, new Set())).toBe(true)
   })
 
-  it('returns true when program has a matching type', () => {
-    expect(matchesInsuranceTypes(p, new Set(['medicare']))).toBe(true)
+  it('returns true when raw string contains the tag (case-insensitive)', () => {
+    expect(matchesInsuranceTypes(p, new Set(['Medicare']))).toBe(true)
   })
 
   it('returns true when one of multiple selections matches', () => {
-    expect(matchesInsuranceTypes(p, new Set(['medicare', 'private insurance']))).toBe(true)
+    expect(matchesInsuranceTypes(p, new Set(['Medicare', 'Private Insurance']))).toBe(true)
   })
 
-  it('returns false when no type matches', () => {
-    expect(matchesInsuranceTypes(p, new Set(['private insurance']))).toBe(false)
+  it('returns false when no tag appears in raw string', () => {
+    expect(matchesInsuranceTypes(p, new Set(['Private Insurance']))).toBe(false)
+  })
+
+  it('matches substring within a longer prose value', () => {
+    const prose = makeProgram({ insuranceTypesRaw: 'Medicare required. Must have Medicare Part A to enroll' })
+    expect(matchesInsuranceTypes(prose, new Set(['Medicare']))).toBe(true)
   })
 })
 
@@ -116,39 +123,10 @@ describe('matchesGrantStatuses', () => {
 // ── matchesSupportAmounts ────────────────────────────────────────────────────
 
 describe('matchesSupportAmounts', () => {
-  it('returns true when no filter active', () => {
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 500 }), new Set())).toBe(true)
-  })
-
-  it('null grantAmount always passes', () => {
+  it('always returns true (support amount filter removed)', () => {
+    expect(matchesSupportAmounts(makeProgram(), new Set())).toBe(true)
+    expect(matchesSupportAmounts(makeProgram(), new Set(['under-1000']))).toBe(true)
     expect(matchesSupportAmounts(makeProgram({ grantAmount: null }), new Set(['under-1000']))).toBe(true)
-  })
-
-  it('under-1000: matches amount < 1000', () => {
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 999 }), new Set(['under-1000']))).toBe(true)
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 1000 }), new Set(['under-1000']))).toBe(false)
-  })
-
-  it('1000-5000: matches 1000 ≤ amount < 5000', () => {
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 1000 }), new Set(['1000-5000']))).toBe(true)
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 4999 }), new Set(['1000-5000']))).toBe(true)
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 5000 }), new Set(['1000-5000']))).toBe(false)
-  })
-
-  it('5000-10000: matches 5000 ≤ amount < 10000', () => {
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 5000 }), new Set(['5000-10000']))).toBe(true)
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 9999 }), new Set(['5000-10000']))).toBe(true)
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 10000 }), new Set(['5000-10000']))).toBe(false)
-  })
-
-  it('10000-plus: matches amount >= 10000', () => {
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 10000 }), new Set(['10000-plus']))).toBe(true)
-    expect(matchesSupportAmounts(makeProgram({ grantAmount: 9999 }), new Set(['10000-plus']))).toBe(false)
-  })
-
-  it('OR: matches any of the selected ranges', () => {
-    const p = makeProgram({ grantAmount: 1500 })
-    expect(matchesSupportAmounts(p, new Set(['under-1000', '1000-5000']))).toBe(true)
   })
 })
 
@@ -156,9 +134,9 @@ describe('matchesSupportAmounts', () => {
 
 describe('computeResults', () => {
   const programs: ProgramRecord[] = [
-    makeProgram({ id: 'a', status: 'Open', insuranceTypes: ['medicare'], grantAmount: 500 }),
-    makeProgram({ id: 'b', status: 'Closed', insuranceTypes: ['private insurance'], grantAmount: 2000 }),
-    makeProgram({ id: 'c', status: 'Open', insuranceTypes: ['medicaid'], grantAmount: 15000 }),
+    makeProgram({ id: 'a', status: 'Open', insuranceTypes: ['medicare'], insuranceTypesRaw: 'Medicare required', insuranceDescription: 'Medicare required', grantAmount: '$500' }),
+    makeProgram({ id: 'b', status: 'Closed', insuranceTypes: ['private insurance'], insuranceTypesRaw: 'Private insurance required', insuranceDescription: 'Private insurance required', grantAmount: '$2,000' }),
+    makeProgram({ id: 'c', status: 'Open', insuranceTypes: ['medicaid'], insuranceTypesRaw: 'Medicaid required', insuranceDescription: 'Medicaid required', grantAmount: '$15,000' }),
   ]
 
   it('returns all programs when no filters or query', () => {
@@ -171,7 +149,7 @@ describe('computeResults', () => {
       debouncedQuery: '',
       filters: {
         ...emptyFilters(),
-        insuranceTypes: new Set(['medicare']),
+        insuranceTypes: new Set(['Medicare']),
         grantStatuses: new Set(['open']),
       },
       sort: { field: null, direction: 'desc' },
@@ -184,7 +162,7 @@ describe('computeResults', () => {
       debouncedQuery: '',
       filters: {
         ...emptyFilters(),
-        insuranceTypes: new Set(['medicare', 'medicaid']),
+        insuranceTypes: new Set(['Medicare', 'Medicaid']),
       },
       sort: { field: null, direction: 'desc' },
     })
